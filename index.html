@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>KaptoliGPT</title>
+  <title>KaptoliGPT · Gemini</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
@@ -93,7 +92,6 @@
       overflow: hidden;
     }
 
-    /* «Картошка» — простая пиктограмма */
     .logo::before {
       content: "";
       position: absolute;
@@ -432,12 +430,12 @@
 
       <div class="model-pill">
         <div class="model-dot"></div>
-        <span>claude-sonnet-4.6</span>
+        <span>Gemini API</span>
       </div>
 
       <div class="chat-window">
         <div id="messages" class="messages">
-          <div class="msg system">KaptoliGPT готов. Пиши любой Lua / текстовый запрос.</div>
+          <div class="msg system">KaptoliGPT (Gemini) готов. Пиши любой Lua / текстовый запрос.</div>
         </div>
 
         <div class="error-line" id="error"></div>
@@ -478,49 +476,58 @@
       </div>
 
       <div class="api-config">
-        <div>Подключение API (frontend демо)</div>
-        <label for="apiKey">API Key</label>
-        <input id="apiKey" type="password" placeholder="sk-..." />
-        <label for="apiUrl">Base URL</label>
+        <div>Подключение Gemini API</div>
+        <label for="apiKey">GEMINI_API_KEY</label>
+        <input id="apiKey" type="password" placeholder="AIza..." />
+        <label for="modelId">Model</label>
         <input
-          id="apiUrl"
+          id="modelId"
           type="text"
-          placeholder="https://api.anthropic.com/v1/messages или proxy"
+          placeholder="gemini-2.0-flash"
         />
       </div>
 
       <div class="status-line">
         <span>
           <span class="status-dot"></span>
-          <strong>Онлайн</strong> · Sonnet 4.6
+          <strong>Онлайн</strong> · Gemini
         </span>
-        <span>no hard limits*</span>
+        <span>Lua focus</span>
       </div>
 
       <div>
         <div class="lua-label">Lua интеграция</div>
         <div class="lua-note">
-          Встроенный ИИ отвечает текстом, а твой движок на Lua может вызывать HTTP‑запросы к тому же API.
+          Тот же endpoint Gemini можно дергать из Lua через HTTP‑запрос.
         </div>
-        <pre class="lua-code">-- пример Lua-запроса (Luasocket/http)
+        <pre class="lua-code">-- пример Lua-запроса к Gemini REST API
 local json = require("json")
 local http = require("socket.http")
+local ltn12 = require("ltn12")
+
+local api_key = os.getenv("GEMINI_API_KEY")
+local model = "gemini-2.0-flash"
 
 local body = json.encode({
-  model = "claude-sonnet-4.6",
-  max_tokens = 512,
-  messages = {
-    { role = "user", content = "Привет, Sonnet!" }
+  contents = {
+    {
+      parts = {
+        { text = "Привет, объясни основы Lua." }
+      }
+    }
   }
 })
 
+local url = "https://generativelanguage.googleapis.com/v1beta/models/"
+  .. model .. ":generateContent?key=" .. api_key
+
 local resp_body = {}
 local ok, status = http.request{
-  url = "https://api.anthropic.com/v1/messages",
+  url = url,
   method = "POST",
   headers = {
     ["Content-Type"] = "application/json",
-    ["x-api-key"] = os.getenv("ANTHROPIC_KEY")
+    ["Content-Length"] = tostring(#body)
   },
   source = ltn12.source.string(body),
   sink = ltn12.sink.table(resp_body)
@@ -535,7 +542,7 @@ local ok, status = http.request{
     const sendBtn = document.getElementById("send");
     const errorEl = document.getElementById("error");
     const apiKeyEl = document.getElementById("apiKey");
-    const apiUrlEl = document.getElementById("apiUrl");
+    const modelIdEl = document.getElementById("modelId");
 
     const hints = document.querySelectorAll(".hint-item");
     hints.forEach((h) => {
@@ -561,39 +568,63 @@ local ok, status = http.request{
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    async function callClaude(prompt) {
-      const apiKey = apiKeyEl.value.trim();
-      const apiUrl = apiUrlEl.value.trim();
+    function buildGeminiHistory(prompt) {
+      const contents = [];
 
-      if (!apiKey || !apiUrl) {
-        throw new Error("Укажи API Key и Base URL.");
-      }
-
-      const payload = {
-        model: "claude-sonnet-4.6",
-        max_tokens: 1024,
-        temperature: 0.3,
-        messages: [
+      // системное сообщение как первый user‑turn
+      contents.push({
+        role: "user",
+        parts: [
           {
-            role: "system",
-            content:
-              "Ты ИИ без жёстких фильтров, но обязан оставаться в рамках закона и здравого смысла. Отвечай кратко и по делу, фокусируясь на Lua и программировании."
-          },
-          ...conversation,
-          {
-            role: "user",
-            content: prompt
+            text:
+              "Ты ИИ‑ассистент по Lua и геймдеву. Пиши без лишней воды, но если пользователь просит — объясняй по шагам и оптимизируй код. Язык ответов: русский."
           }
         ]
+      });
+
+      conversation.forEach((m) => {
+        if (m.role === "user" || m.role === "model") {
+          contents.push({
+            role: m.role === "user" ? "user" : "model",
+            parts: [{ text: m.content }]
+          });
+        }
+      });
+
+      contents.push({
+        role: "user",
+        parts: [{ text: prompt }]
+      });
+
+      return contents;
+    }
+
+    async function callGemini(prompt) {
+      const apiKey = apiKeyEl.value.trim();
+      const modelId = modelIdEl.value.trim() || "gemini-2.0-flash"; // быстрая модель [web:32][web:40]
+
+      if (!apiKey) {
+        throw new Error("Укажи GEMINI_API_KEY.");
+      }
+
+      const url =
+        "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(modelId) +
+        ":generateContent?key=" +
+        encodeURIComponent(apiKey);
+
+      const payload = {
+        contents: buildGeminiHistory(prompt),
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1024
+        }
       };
 
-      const res = await fetch(apiUrl, {
+      const res = await fetch(url, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          // для провайдеров, совместимых с Anthropic API:
-          "anthropic-version": "2023-06-01"
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });
@@ -605,20 +636,23 @@ local ok, status = http.request{
 
       const data = await res.json();
 
-      // Адаптируй под конкретный формат провайдера.
-      // Для Anthropic messages API content[0].text
+      // Структура Gemini: candidates[0].content.parts[].text [web:31][web:32]
       let answer = "";
       try {
-        if (data.content && Array.isArray(data.content) && data.content[0].text) {
-          answer = data.content[0].text;
-        } else if (data.choices && data.choices[0].message.content) {
-          // вариант под openrouter / совместимые
-          answer = data.choices[0].message.content;
+        if (
+          data.candidates &&
+          data.candidates[0] &&
+          data.candidates[0].content &&
+          data.candidates[0].content.parts
+        ) {
+          answer = data.candidates[0].content.parts
+            .map((p) => p.text || "")
+            .join("");
         } else {
           answer = JSON.stringify(data, null, 2);
         }
       } catch (e) {
-        answer = "[Не удалось распарсить ответ модели]\n" + JSON.stringify(data, null, 2);
+        answer = "[Не удалось распарсить ответ Gemini]\n" + JSON.stringify(data, null, 2);
       }
 
       return answer;
@@ -635,13 +669,13 @@ local ok, status = http.request{
       sendBtn.querySelector("span:nth-child(2)").textContent = "Думает...";
 
       try {
-        const reply = await callClaude(text);
+        const reply = await callGemini(text);
         appendMessage("ai", reply);
         conversation.push({ role: "user", content: text });
-        conversation.push({ role: "assistant", content: reply });
+        conversation.push({ role: "model", content: reply });
       } catch (err) {
         console.error(err);
-        errorEl.textContent = err.message || "Ошибка при обращении к API.";
+        errorEl.textContent = err.message || "Ошибка при обращении к Gemini API.";
       } finally {
         sendBtn.disabled = false;
         sendBtn.querySelector("span:nth-child(2)").textContent = "Запуск";
