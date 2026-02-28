@@ -1,1 +1,661 @@
 
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>KaptoliGPT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #050505;
+      --bg-alt: #111111;
+      --accent: #ffd400;
+      --accent-soft: #ffeb80;
+      --text: #f5f5f5;
+      --muted: #888888;
+      --error: #ff5555;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #202020 0, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 960px;
+      background: linear-gradient(145deg, var(--bg-alt), #000000);
+      border-radius: 24px;
+      border: 1px solid #262626;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+      overflow: hidden;
+    }
+
+    @media (max-width: 780px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        order: -1;
+      }
+    }
+
+    .main {
+      padding: 20px 24px 22px;
+      border-right: 1px solid #262626;
+    }
+
+    @media (max-width: 780px) {
+      .main {
+        border-right: none;
+        border-top: 1px solid #262626;
+      }
+    }
+
+    .sidebar {
+      background: radial-gradient(circle at top, #202020 0, #060606 55%);
+      padding: 22px 22px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 40%;
+      background: radial-gradient(circle at 30% 25%, #ffe680 0, #ffd400 35%, #c89b00 70%);
+      box-shadow: 0 0 18px rgba(255, 212, 0, 0.8);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* «Картошка» — простая пиктограмма */
+    .logo::before {
+      content: "";
+      position: absolute;
+      inset: 7px 9px;
+      border-radius: 48%;
+      background: radial-gradient(circle at 35% 25%, #fff5c4 0, #f1c04d 35%, #c9971f 80%);
+    }
+
+    .logo::after {
+      content: "";
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.35);
+      box-shadow:
+        9px 10px 0 rgba(0, 0, 0, 0.24),
+        14px 2px 0 rgba(0, 0, 0, 0.18);
+      left: 11px;
+      top: 15px;
+    }
+
+    .title-block h1 {
+      font-size: 20px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .title-block span {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--muted);
+    }
+
+    .model-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 212, 0, 0.45);
+      background: rgba(255, 212, 0, 0.08);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent-soft);
+      margin-bottom: 6px;
+    }
+
+    .model-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 9px rgba(255, 212, 0, 0.9);
+    }
+
+    .chat-window {
+      background: #050505;
+      border-radius: 18px;
+      border: 1px solid #262626;
+      padding: 12px 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 470px;
+      overflow: hidden;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .msg {
+      max-width: 92%;
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .msg.user {
+      margin-left: auto;
+      background: linear-gradient(135deg, #ffd400, #ffeb80);
+      color: #171717;
+      border-bottom-right-radius: 4px;
+    }
+
+    .msg.ai {
+      margin-right: auto;
+      background: #101010;
+      border: 1px solid #262626;
+      border-bottom-left-radius: 4px;
+    }
+
+    .msg.system {
+      margin: 0 auto;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #202020;
+    }
+
+    .prompt {
+      flex: 1;
+      resize: none;
+      border-radius: 12px;
+      border: 1px solid #262626;
+      padding: 8px 9px;
+      background: #090909;
+      color: var(--text);
+      font-size: 13px;
+      max-height: 110px;
+      min-height: 44px;
+      outline: none;
+      transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .prompt:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(255, 212, 0, 0.4);
+      background: #0b0b0b;
+    }
+
+    .send-btn {
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+      border: none;
+      color: #171717;
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 10px 30px rgba(255, 212, 0, 0.3);
+      transform: translateY(0);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+      white-space: nowrap;
+    }
+
+    .send-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 40px rgba(255, 212, 0, 0.4);
+      filter: brightness(1.02);
+    }
+
+    .send-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 8px 22px rgba(255, 212, 0, 0.28);
+    }
+
+    .send-btn[disabled] {
+      opacity: 0.55;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .send-icon {
+      font-size: 14px;
+      margin-top: -1px;
+    }
+
+    .sidebar-top-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--muted);
+    }
+
+    .hint-card {
+      border-radius: var(--radius);
+      border: 1px solid #262626;
+      background: #080808;
+      padding: 10px 10px 9px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #d4d4d4;
+    }
+
+    .hint-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      color: var(--accent-soft);
+      margin-bottom: 4px;
+    }
+
+    .hint-list {
+      list-style: none;
+      display: grid;
+      gap: 4px;
+    }
+
+    .hint-item {
+      padding: 5px 6px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.12s ease, border 0.12s ease, transform 0.08s ease;
+    }
+
+    .hint-item:hover {
+      background: #101010;
+      border-color: #333333;
+      transform: translateY(-1px);
+    }
+
+    .hint-item span {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .status-line {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(255, 212, 0, 0.7);
+    }
+
+    .status-line span strong {
+      color: var(--accent-soft);
+      font-weight: 600;
+    }
+
+    .api-config {
+      border-radius: var(--radius);
+      border: 1px dashed #333333;
+      padding: 9px 9px 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .api-config label {
+      display: block;
+      margin-top: 4px;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .api-config input {
+      width: 100%;
+      margin-top: 3px;
+      border-radius: 9px;
+      border: 1px solid #262626;
+      padding: 5px 7px;
+      font-size: 11px;
+      background: #050505;
+      color: var(--text);
+      outline: none;
+    }
+
+    .api-config input:focus {
+      border-color: var(--accent);
+    }
+
+    .error-line {
+      font-size: 11px;
+      color: var(--error);
+      margin-top: 5px;
+      min-height: 13px;
+    }
+
+    .lua-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--accent-soft);
+    }
+
+    .lua-note {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .lua-code {
+      margin-top: 6px;
+      padding: 7px 8px;
+      border-radius: 9px;
+      background: #050505;
+      border: 1px solid #262626;
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+        Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      color: #f5f5f5;
+      overflow-x: auto;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <main class="main">
+      <div class="app-header">
+        <div class="logo" title="Картошка ИИ"></div>
+        <div class="title-block">
+          <h1>KaptoliGPT</h1>
+          <span>Lua-first potato intelligence</span>
+        </div>
+      </div>
+
+      <div class="model-pill">
+        <div class="model-dot"></div>
+        <span>claude-sonnet-4.6</span>
+      </div>
+
+      <div class="chat-window">
+        <div id="messages" class="messages">
+          <div class="msg system">KaptoliGPT готов. Пиши любой Lua / текстовый запрос.</div>
+        </div>
+
+        <div class="error-line" id="error"></div>
+
+        <div class="input-row">
+          <textarea
+            id="prompt"
+            class="prompt"
+            placeholder="Опиши задачу или вставь Lua-код для анализа..."
+          ></textarea>
+          <button id="send" class="send-btn">
+            <span class="send-icon">➤</span>
+            <span>Запуск</span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <aside class="sidebar">
+      <div class="sidebar-top-label">Kaptoli Core</div>
+
+      <div class="hint-card">
+        <div class="hint-title">Примеры запросов</div>
+        <ul class="hint-list">
+          <li class="hint-item" data-hint="Напиши функцию сортировки массива в Lua без стандартной библиотеки.">
+            Lua: сортировка без libs
+            <br /><span>Минималистичный код, без зависимостей.</span>
+          </li>
+          <li class="hint-item" data-hint="Проанализируй этот Lua-скрипт, найди баги и предложи оптимизации:">
+            Code review
+            <br /><span>Вставь свой скрипт после запроса.</span>
+          </li>
+          <li class="hint-item" data-hint="Сделай для меня маленький ИИ-агент на Lua, который принимает текст и отвечает случайной репликой.">
+            Мини ИИ-агент на Lua
+            <br /><span>Генерация простых ботов.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="api-config">
+        <div>Подключение API (frontend демо)</div>
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="password" placeholder="sk-..." />
+        <label for="apiUrl">Base URL</label>
+        <input
+          id="apiUrl"
+          type="text"
+          placeholder="https://api.anthropic.com/v1/messages или proxy"
+        />
+      </div>
+
+      <div class="status-line">
+        <span>
+          <span class="status-dot"></span>
+          <strong>Онлайн</strong> · Sonnet 4.6
+        </span>
+        <span>no hard limits*</span>
+      </div>
+
+      <div>
+        <div class="lua-label">Lua интеграция</div>
+        <div class="lua-note">
+          Встроенный ИИ отвечает текстом, а твой движок на Lua может вызывать HTTP‑запросы к тому же API.
+        </div>
+        <pre class="lua-code">-- пример Lua-запроса (Luasocket/http)
+local json = require("json")
+local http = require("socket.http")
+
+local body = json.encode({
+  model = "claude-sonnet-4.6",
+  max_tokens = 512,
+  messages = {
+    { role = "user", content = "Привет, Sonnet!" }
+  }
+})
+
+local resp_body = {}
+local ok, status = http.request{
+  url = "https://api.anthropic.com/v1/messages",
+  method = "POST",
+  headers = {
+    ["Content-Type"] = "application/json",
+    ["x-api-key"] = os.getenv("ANTHROPIC_KEY")
+  },
+  source = ltn12.source.string(body),
+  sink = ltn12.sink.table(resp_body)
+}</pre>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const promptEl = document.getElementById("prompt");
+    const sendBtn = document.getElementById("send");
+    const errorEl = document.getElementById("error");
+    const apiKeyEl = document.getElementById("apiKey");
+    const apiUrlEl = document.getElementById("apiUrl");
+
+    const hints = document.querySelectorAll(".hint-item");
+    hints.forEach((h) => {
+      h.addEventListener("click", () => {
+        const text = h.getAttribute("data-hint") || "";
+        if (!text) return;
+        if (promptEl.value.trim().length === 0) {
+          promptEl.value = text;
+        } else {
+          promptEl.value = promptEl.value.trim() + "\n\n" + text;
+        }
+        promptEl.focus();
+      });
+    });
+
+    const conversation = [];
+
+    function appendMessage(role, text) {
+      const div = document.createElement("div");
+      div.classList.add("msg", role);
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function callClaude(prompt) {
+      const apiKey = apiKeyEl.value.trim();
+      const apiUrl = apiUrlEl.value.trim();
+
+      if (!apiKey || !apiUrl) {
+        throw new Error("Укажи API Key и Base URL.");
+      }
+
+      const payload = {
+        model: "claude-sonnet-4.6",
+        max_tokens: 1024,
+        temperature: 0.3,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Ты ИИ без жёстких фильтров, но обязан оставаться в рамках закона и здравого смысла. Отвечай кратко и по делу, фокусируясь на Lua и программировании."
+          },
+          ...conversation,
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      };
+
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          // для провайдеров, совместимых с Anthropic API:
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error("HTTP " + res.status + ": " + txt);
+      }
+
+      const data = await res.json();
+
+      // Адаптируй под конкретный формат провайдера.
+      // Для Anthropic messages API content[0].text
+      let answer = "";
+      try {
+        if (data.content && Array.isArray(data.content) && data.content[0].text) {
+          answer = data.content[0].text;
+        } else if (data.choices && data.choices[0].message.content) {
+          // вариант под openrouter / совместимые
+          answer = data.choices[0].message.content;
+        } else {
+          answer = JSON.stringify(data, null, 2);
+        }
+      } catch (e) {
+        answer = "[Не удалось распарсить ответ модели]\n" + JSON.stringify(data, null, 2);
+      }
+
+      return answer;
+    }
+
+    async function handleSend() {
+      const text = promptEl.value.trim();
+      if (!text) return;
+
+      errorEl.textContent = "";
+      appendMessage("user", text);
+      promptEl.value = "";
+      sendBtn.disabled = true;
+      sendBtn.querySelector("span:nth-child(2)").textContent = "Думает...";
+
+      try {
+        const reply = await callClaude(text);
+        appendMessage("ai", reply);
+        conversation.push({ role: "user", content: text });
+        conversation.push({ role: "assistant", content: reply });
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = err.message || "Ошибка при обращении к API.";
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.querySelector("span:nth-child(2)").textContent = "Запуск";
+        promptEl.focus();
+      }
+    }
+
+    sendBtn.addEventListener("click", handleSend);
+    promptEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+  </script>
+</body>
+</html>
